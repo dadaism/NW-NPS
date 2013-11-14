@@ -1,4 +1,4 @@
-include ../common/make.config
+include ../../common/make.config
 
 all: nw_gpu.o nw_cpu.o nw-nps
 
