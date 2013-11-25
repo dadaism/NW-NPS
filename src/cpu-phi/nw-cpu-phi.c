@@ -10,15 +10,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda_runtime_api.h>
 #include "global.h"
 #include "nw_cpu.h"
-#include "nw_gpu.h"
+#include "nw_phi.h"
 
 //#define TRACEBACK
 
 extern char blosum62_cpu[24][24];
-extern int tile_size;
+//extern int tile_size;
 
 void init_conf() {
 	config.debug = false;
@@ -26,18 +25,13 @@ void init_conf() {
 	config.kernel = 0;
 	config.cpu_pairs = 20;
 	config.cpu_threads = 1;
-	config.gpu_pairs = 80;
+	config.phi_threads = 32;
+	config.phi_pairs = 80;
 	config.num_streams = 1;
-	config.num_blocks = 28;
-	config.num_threads = 32;
 	config.length = 1600;
 	config.penalty = -10;
 }
 
-void init_device(int device) {
-	cudaSetDevice(device);
-	cudaFree(0);
-}
 
 void usage(int argc, char **argv)
 {
@@ -46,13 +40,12 @@ void usage(int argc, char **argv)
     fprintf(stderr, "\t[--penalty|-p <penalty>] - penalty (negative integer, default: %d)\n",config.penalty);
     fprintf(stderr, "\t[--cpu_pairs|-c <number>] - number of pairs on cpu (default: %d)\n",config.cpu_pairs);
     fprintf(stderr, "\t[--cpu_threads|-T <threads> ]- threads number on cpu (default: %d)\n",config.cpu_threads);
-    fprintf(stderr, "\t[--gpu_pairs|-g <number>] - number of pairs on gpu (default: %d)\n",config.gpu_pairs);
-    fprintf(stderr, "\t[--device|-d <device> ]- device ID (default: %d)\n",config.device);
-    fprintf(stderr, "\t[--kernel|-k <kernel type> ]- 0: diagonal 1: tile (default: %d)\n",config.kernel);
-    fprintf(stderr, "\t[--num_blocks|-b <blocks> ]- blocks number per grid (default: %d)\n",config.num_blocks);
-    fprintf(stderr, "\t[--num_threads|-t <threads> ]- threads number per block (default: %d)\n",config.num_threads);
-    fprintf(stderr, "\t[--debug]- 0: no validation 1: validation (default: %d)\n",config.debug);
-    fprintf(stderr, "\t[--help|-h]- Help information \n");
+    fprintf(stderr, "\t[--phi_pairs|-p <number>] - number of pairs on phi (default: %d)\n",config.phi_pairs);
+    fprintf(stderr, "\t[--phi_threads|-t <threads> ] - threads number per block (default: %d)\n",config.phi_threads);
+    fprintf(stderr, "\t[--device|-d <device> ] - device ID (default: %d)\n",config.device);
+    fprintf(stderr, "\t[--kernel|-k <kernel type> ] - 0: (default: %d)\n",config.kernel);
+    fprintf(stderr, "\t[--debug] - 0: no validation 1: validation (default: %d)\n",config.debug);
+    fprintf(stderr, "\t[--help|-h] - print help information\n");
     exit(1);
 }
 
@@ -61,27 +54,24 @@ void print_config()
 	fprintf(stderr, "=============== Configuration ================\n");
     fprintf(stderr, "device = %d\n", config.device);
 	fprintf(stderr, "kernel = %d\n", config.kernel);
-	if ( config.kernel == 1 )
-		fprintf(stderr, "tile size = %d\n", tile_size);
     fprintf(stderr, "On CPU - sequence number = %d\n", config.cpu_pairs);
     fprintf(stderr, "       - thread number = %d\n", config.cpu_threads);
-    fprintf(stderr, "On GPU - sequence number = %d\n", config.gpu_pairs);
+    fprintf(stderr, "On PHI - sequence number = %d\n", config.phi_pairs);
     fprintf(stderr, "       - stream number = %d\n", config.num_streams);
+    fprintf(stderr, "       - thread number = %d\n", config.phi_threads);
 	fprintf(stderr, "sequence length = %d\n", config.length);
     fprintf(stderr, "penalty = %d\n", config.penalty);
-    fprintf(stderr, "block number = %d\n", config.num_blocks);
-    fprintf(stderr, "thread number = %d\n", config.num_threads);
     fprintf(stderr, "debug = %d\n", config.debug);
 	printf("==============================================\n");
 }
 
 void validate_config()
 {
-    if ( config.length % tile_size != 0 &&
+    /*if ( config.length % tile_size != 0 &&
          config.kernel == 1 ) {
         fprintf(stderr, "Tile kernel used.\nSequence length should be multiple times of tile size %d\n", tile_size);
         exit(1);
-    }
+    }*/
 }
 
 int validation(int *score_matrix_cpu, int *score_matrix, unsigned int length)
@@ -94,7 +84,7 @@ int validation(int *score_matrix_cpu, int *score_matrix, unsigned int length)
             continue;
         }
         else {
-            printf("On GPU: score_matrix[%d] = %d\n", i, score_matrix[i]);
+            printf("On PHI: score_matrix[%d] = %d\n", i, score_matrix[i]);
             printf("On CPU: score_matrix[%d] = %d\n", i, score_matrix_cpu[i]);
             return 0;
         }
@@ -122,24 +112,10 @@ int parse_arguments(int argc, char **argv)
 		}else if(strcmp(argv[i], "-k") == 0 || strcmp(argv[i], "--kernel") == 0){
 			i++;
 			if (i==argc){
-				fprintf(stderr,"device number missing.\n");
+				fprintf(stderr,"kernel number missing.\n");
 				return 0 ;
 			}
 			config.kernel = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--num_threads") == 0){
-			i++;
-			if (i==argc){
-				fprintf(stderr,"thread number missing.\n");
-				return 0 ;
-			}
-			config.num_threads = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--num_blocks") == 0){
-			i++;
-			if (i==argc){
-				fprintf(stderr,"block number missing.\n");
-				return 0 ;
-			}
-			config.num_blocks = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--penalty") == 0){
 			i++;
 			if (i==argc){
@@ -161,13 +137,20 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.cpu_threads = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--gpu_pairs") == 0){
+		}else if(strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--phi_pairs") == 0){
 			i++;
 			if (i==argc){
-				fprintf(stderr,"pair number on gpu missing.\n");
+				fprintf(stderr,"pair number on phi missing.\n");
 				return 0 ;
 			}
-			config.gpu_pairs = atoi(argv[i]);
+			config.phi_pairs = atoi(argv[i]);
+		}else if(strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--phi_threads") == 0){
+			i++;
+			if (i==argc){
+				fprintf(stderr,"thread number on PHI missing.\n");
+				return 0 ;
+			}
+			config.phi_threads = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--lengths") == 0){
 			i++;
 			if (i==argc){
@@ -179,12 +162,9 @@ int parse_arguments(int argc, char **argv)
 				fprintf(stderr,"The maximum seqence length is %d\n", MAX_SEQ_LEN);
 				return 0;
 			}
-		}else if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-			usage(argc, argv);
-			return 0;
 		}
 		else {
-			fprintf(stderr, "Unrecognized option : %s\nTry --help for more information\n", argv[i]);
+			fprintf(stderr, "Unrecognized option : %s", argv[i]);
 			return 0;
 		}
 		i++;
@@ -206,7 +186,7 @@ int main(int argc, char **argv)
 	int seq_len = config.length;
 	DEBUG = config.debug;
 
-	cudaStream_t stream[config.num_streams];
+	//cudaStream_t stream[config.num_streams];
 
 	int *score_matrix[config.num_streams];
 	srand ( 7 );
@@ -215,7 +195,7 @@ int main(int argc, char **argv)
 		if ( k==0 )
 			pair_num[k] = config.cpu_pairs;
 		else
-			pair_num[k] = config.gpu_pairs;
+			pair_num[k] = config.phi_pairs;
 			
     	for (int i=0; i<pair_num[k]; ++i){
         	//please define your own sequence 1
@@ -237,15 +217,16 @@ int main(int argc, char **argv)
 		
 		score_matrix[k] = (int *)malloc( pos_matrix[k][pair_num[k]]*sizeof(int) );
 	}
-	/* initialize the GPU */
+	/* initialize the PHI */
 	s_time = gettime();
-	init_device( dev_num );
+	
+
 	e_time = gettime();
-	printf("Initialize GPU : %fs\n", e_time - s_time);
+	printf("Initialize Xeon Phi : %fs\n", e_time - s_time);
 
 	s_time = gettime();
-	for (int i=1; i<=config.num_streams; ++i) {
-		nw_gpu_allocate(i);
+	/*for (int i=0; i<config.num_streams; ++i) {
+		nw_gpu_allocate(i+1);
 		cudaStreamCreate( &(stream[i]) );
 	}
 	e_time = gettime();
@@ -257,9 +238,9 @@ int main(int argc, char **argv)
 		if ( pair_num[i]!=0 ) {
 			nw_gpu(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix[i], pos_matrix[i], pair_num[i], d_score_matrix[i], stream[i], i, config.kernel);
 		}
-	}
+	}*/
     needleman_cpu_omp(sequence_set1[0], sequence_set2[0], pos1[0], pos2[0], score_matrix[0], pos_matrix[0], pair_num[0], penalty);
-	
+	/*
 	for (int i=1; i<=config.num_streams; ++i ) {
 		if ( pair_num[i]!=0 ) {
 			nw_gpu_copyback(score_matrix[i], d_score_matrix[i], pos_matrix[i], pair_num[i], i);
@@ -267,7 +248,7 @@ int main(int argc, char **argv)
 	}
 	e_time = gettime();
 	printf("Computation on CPU & GPU : %fs\n", e_time - s_time);
-	
+	*/
 	if (DEBUG) {
 		for ( int i=0; i<config.num_streams; ++i) {
     		int *score_matrix_cpu = (int *)malloc( pos_matrix[i][pair_num[i]]*sizeof(int));
@@ -280,9 +261,4 @@ int main(int argc, char **argv)
 		}
 	}
 	printf("\n");
-	for (int i=1; i<config.num_streams; ++i ) {
-		nw_gpu_destroy(i);
-		cudaStreamDestroy ( stream[i] );
-	}
-	
 }

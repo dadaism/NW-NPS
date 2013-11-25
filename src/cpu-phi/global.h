@@ -13,21 +13,25 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 #include <sys/time.h>
 #include <omp.h>
 
 #define MAX_SEQ_LEN 2000
 #define MAX_SEQ_NUM 200
-#define MAX_STREAM 20
+#define TILE_SIZE 16
+#define MAX_STREAM 8
 
 struct _CONF_ {
 	bool debug;
 	int device;
 	int kernel;
-	int num_threads;
-	int num_blocks;
 	int num_streams;
-	int num_pairs[MAX_STREAM];
+	int cpu_threads;
+	int cpu_pairs;
+	int phi_threads;
+	int phi_pairs;
 	int length;
 	int penalty;
 };

@@ -46,7 +46,6 @@ void usage(int argc, char **argv)
     fprintf(stderr, "\t[--num_blocks|-b <blocks> ]- blocks number per grid (default: %d)\n",config.num_blocks);
     fprintf(stderr, "\t[--num_threads|-t <threads> ]- threads number per block (default: %d)\n",config.num_threads);
     fprintf(stderr, "\t[--debug]- 0: no validation 1: validation (default: %d)\n",config.debug);
-    fprintf(stderr, "\t[--help|-h]- Help information\n");
     exit(1);
 }
 
@@ -170,13 +169,6 @@ int parse_arguments(int argc, char **argv)
 				fprintf(stderr,"The maximum seqence length is %d\n", MAX_SEQ_LEN);
 				return 0;
 			}
-		}else if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-			usage(argc, argv);
-			return 0;
-		}
-		else {
-			fprintf(stderr,"Unrecognized option : %s\nTry --help for more information\n", argv[i]);
-			return 0;
 		}
 		i++;
 	}
@@ -196,12 +188,6 @@ int main(int argc, char **argv)
 	int seq1_len, seq2_len;
 	int seq_len = config.length;
 	DEBUG = config.debug;
-	
-	/* initialize the GPU */
-	s_time = gettime();
-	init_device( dev_num );
-	e_time = gettime();
-	fprintf(stderr,"Initialize GPU : %fs\n", e_time - s_time);
 
 	cudaStream_t stream[config.num_streams];
 
@@ -232,6 +218,11 @@ int main(int argc, char **argv)
 		// Pinned memory
 		cudaMallocHost( (void **)&score_matrix[k],  pos_matrix[k][pair_num[k]]*sizeof(int) );
 	}
+	/* initialize the GPU */
+	s_time = gettime();
+	init_device( dev_num );
+	e_time = gettime();
+	fprintf(stderr,"Initialize GPU : %fs\n", e_time - s_time);
 
 	s_time = gettime();
 	for (int i=0; i<config.num_streams; ++i) {
@@ -242,19 +233,17 @@ int main(int argc, char **argv)
 	fprintf(stderr,"Memory allocation and copy on GPU : %fs\n", e_time - s_time);
 	
 	s_time = gettime();
-	omp_set_num_threads(config.num_streams);
-	#pragma omp parallel for
 	for (int i=0; i<config.num_streams; ++i ) {
 		double stream_time_s, stream_time_e;
 		stream_time_s = gettime();
 		if (DEBUG) {
-			fprintf(stderr,"Stream[%d] starts\n", i);
+			fprintf(stderr,"Dataset[%d] starts\n", i);
 		}
-		nw_gpu(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix[i], pos_matrix[i], pair_num[i], d_score_matrix[i], stream[i], i, config.kernel);
-		nw_gpu_copyback(score_matrix[i], d_score_matrix[i], pos_matrix[i], pair_num[i], stream[i],i);
-		cudaStreamSynchronize(stream[i]);
+		nw_gpu(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix[i], pos_matrix[i], pair_num[i], d_score_matrix[i], stream[0], i, config.kernel);
+		nw_gpu_copyback(score_matrix[i], d_score_matrix[i], pos_matrix[i], pair_num[i], stream[0],i);
+		cudaStreamSynchronize(stream[0]);
 		stream_time_e = gettime();
-		fprintf(stderr,"Stream[%d] runtime on GPU : %fs\n", i, stream_time_e - stream_time_s);
+		fprintf(stderr,"Dataset[%d] runtime on GPU : %fs\n", i, stream_time_e - stream_time_s);
 	}	
 	e_time = gettime();
 	fprintf(stderr,"Total runtime on GPU : %fs\n", e_time - s_time);

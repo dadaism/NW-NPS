@@ -77,12 +77,14 @@ void nw_gpu(char * sequence_set1, char * sequence_set2, unsigned int * pos1, uns
 	}
 }
 
-void nw_gpu_copyback(int *score_matrix, int *d_score_matrix, unsigned int *pos_matrix, unsigned int pair_num, int stream_num)
+void nw_gpu_copyback(int *score_matrix, int *d_score_matrix, unsigned int *pos_matrix, unsigned int pair_num, cudaStream_t stream, int stream_num)
 {
 	int i = stream_num;
 	/* Memcpy to host */
-	printf("Stream %d : %d pairs\n", i, pair_num);
-	cudaCheckError(__LINE__,cudaMemcpy(score_matrix,d_score_matrix,sizeof(int)*pos_matrix[pair_num],cudaMemcpyDeviceToHost ) );
+	if (DEBUG) {
+		printf("Dataset %d : %d pairs\n", i, pair_num);
+	}
+	cudaCheckError(__LINE__,cudaMemcpyAsync(score_matrix,d_score_matrix,sizeof(int)*pos_matrix[pair_num],cudaMemcpyDeviceToHost, stream ) );
 }
 
 void nw_cuda_diagonal( cudaStream_t stream, int stream_num)

@@ -21,9 +21,9 @@ Usage
 
 To see the usage, invoke "./nw-cpu-gpu" without arguments.
 
-> ./nw-cpu-phi
+> ./nw-cpu-gpu
 
-Usage: ./nw-cpu-phi [options]
+Usage: ./nw-cpu-gpu [options]
 		[--length|-l <length> ] - x and y length
 		[--penalty|-p <penalty>] - penalty (negative integer)
 		[--cpu_pairs|-c <number>] - number of pairs on cpu

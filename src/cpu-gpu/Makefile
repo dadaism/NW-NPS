@@ -12,7 +12,7 @@ nw_cpu.o: nw_cpu.c
 	$(GCC) $(GCC_FLAGS) $^ -c -o $@
 
 nw-cpu-gpu:	global.o nw_cpu.o nw_gpu.o nw-cpu-gpu.cu
-	$(NVCC) $(GCC_FLAGS) $^ -L$(CUDA_LIB_DIR) -lcuda -lcudart -I$(INCLUDE) -o $@
+	$(NVCC) $(NVCC_FLAGS) $^ -L$(CUDA_LIB_DIR) -lcuda -lcudart -I$(INCLUDE) -o $@
 
 clean:
 	rm *.o nw-cpu-gpu
