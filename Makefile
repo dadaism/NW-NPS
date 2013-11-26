@@ -8,6 +8,7 @@ all:
 	cd src/optimization;		make;	mv nw-nps $(BIN);	rm -f *.o;
 	cd src/multi-stream;		make;	mv nw-multi-stream $(BIN);	rm -f *.o;
 	cd src/cpu-gpu;				make;	mv nw-cpu-gpu $(BIN);	rm -f *.o;
+	cd src/multi-async-offload;	make;	mv nw-cpu-gpu $(BIN);	rm -f *.o;
 	cd utility;	make;	mv stat   $(BIN);	rm -f *.o;
 
 clean:

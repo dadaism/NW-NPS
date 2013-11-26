@@ -15,4 +15,4 @@ nw-cpu-gpu:	global.o nw_cpu.o nw_gpu.o nw-cpu-gpu.cu
 	$(NVCC) $(NVCC_FLAGS) $^ -L$(CUDA_LIB_DIR) -lcuda -lcudart -I$(INCLUDE) -o $@
 
 clean:
-	rm *.o nw-cpu-gpu
+	rm -f *.o nw-cpu-gpu

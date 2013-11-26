@@ -24,10 +24,9 @@ void init_conf() {
 	config.debug = false;
 	config.device = 0;
 	config.kernel = 0;
-	config.cpu_pairs = 20;
 	config.cpu_threads = 1;
-	config.gpu_pairs = 80;
-	config.num_streams = 1;
+	config.fraction = 20;
+	config.num_streams = 0;
 	config.num_blocks = 28;
 	config.num_threads = 32;
 	config.length = 1600;
@@ -42,15 +41,15 @@ void init_device(int device) {
 void usage(int argc, char **argv)
 {
     fprintf(stderr, "\nUsage: %s [options]\n", argv[0]);
-    fprintf(stderr, "\t[--length|-l <length> ] - x and y length (default: %d)\n",config.length);
+    fprintf(stderr, "\t[--length|-l <length>] - x and y length (default: %d)\n",config.length);
     fprintf(stderr, "\t[--penalty|-p <penalty>] - penalty (negative integer, default: %d)\n",config.penalty);
-    fprintf(stderr, "\t[--cpu_pairs|-c <number>] - number of pairs on cpu (default: %d)\n",config.cpu_pairs);
-    fprintf(stderr, "\t[--cpu_threads|-T <threads> ]- threads number on cpu (default: %d)\n",config.cpu_threads);
-    fprintf(stderr, "\t[--gpu_pairs|-g <number>] - number of pairs on gpu (default: %d)\n",config.gpu_pairs);
-    fprintf(stderr, "\t[--device|-d <device> ]- device ID (default: %d)\n",config.device);
-    fprintf(stderr, "\t[--kernel|-k <kernel type> ]- 0: diagonal 1: tile (default: %d)\n",config.kernel);
-    fprintf(stderr, "\t[--num_blocks|-b <blocks> ]- blocks number per grid (default: %d)\n",config.num_blocks);
-    fprintf(stderr, "\t[--num_threads|-t <threads> ]- threads number per block (default: %d)\n",config.num_threads);
+    fprintf(stderr, "\t[--num_pairs|-n <number>] - number of pairs per stream (default: %d)\n",config.num_pairs);
+    fprintf(stderr, "\t[--cpu_threads|-T <threads>]- threads number on cpu (default: %d)\n",config.cpu_threads);
+	fprintf(stderr, "\t[--f_cpu|-f <number>]- fraction of pairs on CPU (default: %d)\n",config.fraction);
+	fprintf(stderr, "\t[--device|-d <device>]- device ID (default: %d)\n",config.device);
+    fprintf(stderr, "\t[--kernel|-k <kernel type>]- 0: diagonal 1: tile (default: %d)\n",config.kernel);
+    fprintf(stderr, "\t[--num_blocks|-b <blocks>]- blocks number per grid (default: %d)\n",config.num_blocks);
+    fprintf(stderr, "\t[--num_threads|-t <threads>]- threads number per block (default: %d)\n",config.num_threads);
     fprintf(stderr, "\t[--debug]- 0: no validation 1: validation (default: %d)\n",config.debug);
     fprintf(stderr, "\t[--help|-h]- Help information \n");
     exit(1);
@@ -63,10 +62,12 @@ void print_config()
 	fprintf(stderr, "kernel = %d\n", config.kernel);
 	if ( config.kernel == 1 )
 		fprintf(stderr, "tile size = %d\n", tile_size);
-    fprintf(stderr, "On CPU - sequence number = %d\n", config.cpu_pairs);
-    fprintf(stderr, "       - thread number = %d\n", config.cpu_threads);
-    fprintf(stderr, "On GPU - sequence number = %d\n", config.gpu_pairs);
-    fprintf(stderr, "       - stream number = %d\n", config.num_streams);
+    fprintf(stderr, "stream number = %d\n", config.num_streams);
+	for (int i=0; i<config.num_streams; ++i) {
+    	fprintf(stderr, "Case %d - sequence number = %d\n", i, config.num_pairs[i]);
+	}
+	fprintf(stderr, "threads CPU = %d\n", config.cpu_threads);
+	fprintf(stderr, "fraction on CPU = %d\n", config.fraction);
 	fprintf(stderr, "sequence length = %d\n", config.length);
     fprintf(stderr, "penalty = %d\n", config.penalty);
     fprintf(stderr, "block number = %d\n", config.num_blocks);
@@ -87,7 +88,6 @@ void validate_config()
 int validation(int *score_matrix_cpu, int *score_matrix, unsigned int length)
 {
     unsigned int i = 0;
-	//printf("Length : %d\n", length);
     while (i!=length){
         if ( score_matrix_cpu[i]==score_matrix[i] ){
             ++i;
@@ -147,13 +147,29 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.penalty = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--cpu_pairs") == 0){
+		}else if(strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--num_pairs") == 0){
 			i++;
 			if (i==argc){
 				fprintf(stderr,"sequence length missing.\n");
 				return 0 ;
 			}
-			config.cpu_pairs = atoi(argv[i]);
+			config.num_pairs[ config.num_streams ] = atoi(argv[i]);
+			if ( config.num_pairs[ config.num_streams ] > MAX_SEQ_NUM ) {
+				fprintf(stderr, "The maximum sequence number per stream is %d\n", MAX_SEQ_NUM);
+				return 0;
+			}
+			config.num_streams++;
+		}else if(strcmp(argv[i], "-f") ==0 || strcmp(argv[i], "--f_cpu") == 0){
+			i++;
+			if (i==argc){
+				fprintf(stderr,"fraction on CPU missing.\n");
+				return 0 ;
+			}
+			config.fraction = atoi(argv[i]);
+			if ( config.fraction<0 || config.fraction>100 ) {
+				fprintf(stderr,"Illegal fraction on CPU : %d%.\n", config.fraction);
+				return 0;
+			}
 		}else if(strcmp(argv[i], "-T") == 0 || strcmp(argv[i], "--cpu_threads") == 0){
 			i++;
 			if (i==argc){
@@ -161,13 +177,6 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.cpu_threads = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--gpu_pairs") == 0){
-			i++;
-			if (i==argc){
-				fprintf(stderr,"pair number on gpu missing.\n");
-				return 0 ;
-			}
-			config.gpu_pairs = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--lengths") == 0){
 			i++;
 			if (i==argc){
@@ -184,7 +193,7 @@ int parse_arguments(int argc, char **argv)
 			return 0;
 		}
 		else {
-			fprintf(stderr, "Unrecognized option : %s\nTry --help for more information\n", argv[i]);
+			fprintf(stderr, "Unrecognized option : %s\nTry --help for more information", argv[i]);
 			return 0;
 		}
 		i++;
@@ -209,17 +218,20 @@ int main(int argc, char **argv)
 	cudaStream_t stream[config.num_streams];
 
 	int *score_matrix[config.num_streams];
+	int *score_matrix_cpu[config.num_streams];
 	srand ( 7 );
-	for (int k=0; k<2;++k) {
+	/* generate data */
+	for (int k=0; k<config.num_streams;++k) {
+		pair_num_cpu[k] = config.num_pairs[k] * config.fraction / 100;
+		pair_num_gpu[k] = config.num_pairs[k] - pair_num_cpu[k];
+		fprintf(stderr, "stream %d:\n", k);
+		fprintf(stderr, "    - On GPU : %d\n", pair_num_gpu[k]);
+		fprintf(stderr, "    - On CPU : %d\n", pair_num_cpu[k]);
+		/* On GPU */
     	pos_matrix[k][0] = pos1[k][0] = pos2[k][0] = 0;
-		if ( k==0 )
-			pair_num[k] = config.cpu_pairs;
-		else
-			pair_num[k] = config.gpu_pairs;
-			
-    	for (int i=0; i<pair_num[k]; ++i){
-        	//please define your own sequence 1
-        	seq1_len = seq_len; //64+rand() % 20;
+   		for (int i=0; i<pair_num_gpu[k]; ++i){
+       		//please define your own sequence 1
+       		seq1_len = seq_len; //64+rand() % 20;
         	//printf("Seq1 length: %d\n", seq1_len);    
         	for (int j=0; j<seq1_len; ++j)
             	sequence_set1[k][ pos1[k][i] + j ] = rand() % 20 + 1;
@@ -234,8 +246,28 @@ int main(int argc, char **argv)
         	pos_matrix[k][i+1] = pos_matrix[k][i] + (seq1_len+1) * (seq2_len+1);
 			dim_matrix[k][i] = (unsigned int)ceil( (float)seq_len/TILE_SIZE )*TILE_SIZE;
     	}
-		
-		score_matrix[k] = (int *)malloc( pos_matrix[k][pair_num[k]]*sizeof(int) );
+		score_matrix[k] = (int *)malloc( pos_matrix[k][pair_num_gpu[k]]*sizeof(int) );
+	
+		/* On CPU */
+    	pos_matrix_cpu[k][0] = pos1_cpu[k][0] = pos2_cpu[k][0] = 0;
+   		for (int i=0; i<pair_num_cpu[k]; ++i){
+       		//please define your own sequence 1
+       		seq1_len = seq_len; //64+rand() % 20;
+        	//printf("Seq1 length: %d\n", seq1_len);    
+        	for (int j=0; j<seq1_len; ++j)
+            	sequence_set1_cpu[k][ pos1_cpu[k][i] + j ] = rand() % 20 + 1;
+        	pos1_cpu[k][i+1] = pos1_cpu[k][i] + seq1_len;
+        	//please define your own sequence 2.
+        	seq2_len = seq_len;//64+rand() % 20;       
+        	//printf("Seq2 length: %d\n\n", seq2_len);      
+        	for (int j=0; j<seq2_len; ++j)
+            	sequence_set2_cpu[k][ pos2_cpu[k][i] +j ] = rand() % 20 + 1;
+        	pos2_cpu[k][i+1] = pos2_cpu[k][i] + seq2_len;
+        	//printf("Matrix size increase: %d\n", (seq1_len+1) * (seq2_len+1));
+        	pos_matrix_cpu[k][i+1] = pos_matrix_cpu[k][i] + (seq1_len+1) * (seq2_len+1);
+			dim_matrix_cpu[k][i] = (unsigned int)ceil( (float)seq_len/TILE_SIZE )*TILE_SIZE;
+    	}
+		score_matrix_cpu[k] = (int *)malloc( pos_matrix_cpu[k][pair_num_cpu[k]]*sizeof(int) );
 	}
 	/* initialize the GPU */
 	s_time = gettime();
@@ -244,7 +276,7 @@ int main(int argc, char **argv)
 	printf("Initialize GPU : %fs\n", e_time - s_time);
 
 	s_time = gettime();
-	for (int i=1; i<=config.num_streams; ++i) {
+	for (int i=0; i<config.num_streams; ++i) {
 		nw_gpu_allocate(i);
 		cudaStreamCreate( &(stream[i]) );
 	}
@@ -253,16 +285,22 @@ int main(int argc, char **argv)
 	
 	s_time = gettime();
 	#pragma omp parallel for
-	for (int i=1; i<=config.num_streams; ++i ) {
-		if ( pair_num[i]!=0 ) {
-			nw_gpu(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix[i], pos_matrix[i], pair_num[i], d_score_matrix[i], stream[i], i, config.kernel);
+	for (int i=0; i<config.num_streams; ++i ) {
+		if ( pair_num_gpu[i]!=0 ) {
+			nw_gpu(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], 
+				   score_matrix[i], pos_matrix[i], pair_num_gpu[i], 
+				   d_score_matrix[i], stream[i], i, config.kernel);
 		}
 	}
-    needleman_cpu_omp(sequence_set1[0], sequence_set2[0], pos1[0], pos2[0], score_matrix[0], pos_matrix[0], pair_num[0], penalty);
-	
-	for (int i=1; i<=config.num_streams; ++i ) {
-		if ( pair_num[i]!=0 ) {
-			nw_gpu_copyback(score_matrix[i], d_score_matrix[i], pos_matrix[i], pair_num[i], i);
+	for (int i=0; i<config.num_streams; ++i ) {
+		if ( pair_num_cpu[i]!=0 ) {
+    		needleman_cpu_omp(sequence_set1_cpu[i], sequence_set2_cpu[i], pos1_cpu[i], pos2_cpu[i], score_matrix_cpu[i], pos_matrix_cpu[i], pair_num_cpu[i], penalty);
+		}
+	}
+	#pragma omp parallel for
+	for (int i=0; i<config.num_streams; ++i ) {
+		if ( pair_num_gpu[i]!=0 ) {
+			nw_gpu_copyback(score_matrix[i], d_score_matrix[i], pos_matrix[i], pair_num_gpu[i], i);
 		}
 	}
 	e_time = gettime();
@@ -270,19 +308,26 @@ int main(int argc, char **argv)
 	
 	if (DEBUG) {
 		for ( int i=0; i<config.num_streams; ++i) {
-    		int *score_matrix_cpu = (int *)malloc( pos_matrix[i][pair_num[i]]*sizeof(int));
-    		needleman_cpu_omp(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix_cpu, pos_matrix[i], pair_num[i], penalty);
-			if ( validation(score_matrix_cpu, score_matrix[i], pos_matrix[i][pair_num[i]]) )
-        		printf("Stream %d - Validation: PASS\n", i);
+    		int *score_matrix_valid = (int *)malloc( pos_matrix[i][pair_num_gpu[i]]*sizeof(int));
+    		needleman_cpu_omp(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix_valid, pos_matrix[i], pair_num_gpu[i], penalty);
+			if ( validation(score_matrix_valid, score_matrix[i], pos_matrix[i][pair_num_gpu[i]]) )
+        		printf("Stream %d - On GPU Validation: PASS\n", i);
     		else
-        		printf("Stream %d - Validation: FAIL\n", i);
-			free(score_matrix_cpu);
+        		printf("Stream %d - On GPU Validation: FAIL\n", i);
+			free(score_matrix_valid);
+    		score_matrix_valid = (int *)malloc( pos_matrix_cpu[i][pair_num_cpu[i]]*sizeof(int));
+    		needleman_cpu_omp(sequence_set1_cpu[i], sequence_set2_cpu[i], pos1_cpu[i], pos2_cpu[i], score_matrix_valid, pos_matrix_cpu[i], pair_num_cpu[i], penalty);
+			if ( validation(score_matrix_valid, score_matrix_cpu[i], pos_matrix_cpu[i][pair_num_cpu[i]]) )
+        		printf("Stream %d - On CPU Validation: PASS\n", i);
+    		else
+        		printf("Stream %d - On CPU Validation: FAIL\n", i);
+			free(score_matrix_valid);
 		}
 	}
 	printf("\n");
-	for (int i=1; i<config.num_streams; ++i ) {
+	for (int i=0; i<config.num_streams; ++i ) {
 		nw_gpu_destroy(i);
 		cudaStreamDestroy ( stream[i] );
 	}
-	
+
 }

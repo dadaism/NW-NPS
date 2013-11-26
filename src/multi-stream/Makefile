@@ -18,4 +18,4 @@ nw-single-stream:	global.o nw_cpu.o nw_gpu.o nw-single-stream.cu
 	$(NVCC) $(NVCC_FLAGS) $^ -L$(CUDA_LIB_DIR) -lcuda -lcudart -I$(INCLUDE) -o $@
 
 clean:
-	rm *.o nw-multi-stream
+	rm -f *.o nw-multi-stream
