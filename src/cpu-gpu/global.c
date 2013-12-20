@@ -39,7 +39,6 @@ unsigned int * d_pos2[MAX_STREAM];
 int * d_score_matrix[MAX_STREAM];
 unsigned int * d_pos_matrix[MAX_STREAM];
 unsigned int * d_dim_matrix[MAX_STREAM];
-int pair_num[MAX_STREAM];
 int pair_num_gpu[MAX_STREAM];
 int pair_num_cpu[MAX_STREAM];
 int penalty;

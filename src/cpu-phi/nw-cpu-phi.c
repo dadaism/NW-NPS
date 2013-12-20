@@ -23,11 +23,9 @@ void init_conf() {
 	config.debug = false;
 	config.device = 0;
 	config.kernel = 0;
-	config.cpu_pairs = 20;
 	config.cpu_threads = 1;
 	config.phi_threads = 32;
-	config.phi_pairs = 80;
-	config.num_streams = 1;
+	config.num_streams = 0;
 	config.length = 1600;
 	config.penalty = -10;
 }
@@ -38,10 +36,10 @@ void usage(int argc, char **argv)
     fprintf(stderr, "\nUsage: %s [options]\n", argv[0]);
     fprintf(stderr, "\t[--length|-l <length> ] - x and y length (default: %d)\n",config.length);
     fprintf(stderr, "\t[--penalty|-p <penalty>] - penalty (negative integer, default: %d)\n",config.penalty);
-    fprintf(stderr, "\t[--cpu_pairs|-c <number>] - number of pairs on cpu (default: %d)\n",config.cpu_pairs);
-    fprintf(stderr, "\t[--cpu_threads|-T <threads> ]- threads number on cpu (default: %d)\n",config.cpu_threads);
-    fprintf(stderr, "\t[--phi_pairs|-p <number>] - number of pairs on phi (default: %d)\n",config.phi_pairs);
+    fprintf(stderr, "\t[--num_pairs|-n <number>] - number of pairs per stream (default: %d)\n",config.num_pairs);
+    fprintf(stderr, "\t[--cpu_threads|-T <threads> ]- threads number on CPU (default: %d)\n",config.cpu_threads);
     fprintf(stderr, "\t[--phi_threads|-t <threads> ] - threads number per block (default: %d)\n",config.phi_threads);
+    fprintf(stderr, "\t[--f_cpu|-f <number>] - fraction of pairs on CPU (default: %d)\n",config.fraction);
     fprintf(stderr, "\t[--device|-d <device> ] - device ID (default: %d)\n",config.device);
     fprintf(stderr, "\t[--kernel|-k <kernel type> ] - 0: (default: %d)\n",config.kernel);
     fprintf(stderr, "\t[--debug] - 0: no validation 1: validation (default: %d)\n",config.debug);
@@ -54,11 +52,12 @@ void print_config()
 	fprintf(stderr, "=============== Configuration ================\n");
     fprintf(stderr, "device = %d\n", config.device);
 	fprintf(stderr, "kernel = %d\n", config.kernel);
-    fprintf(stderr, "On CPU - sequence number = %d\n", config.cpu_pairs);
-    fprintf(stderr, "       - thread number = %d\n", config.cpu_threads);
-    fprintf(stderr, "On PHI - sequence number = %d\n", config.phi_pairs);
-    fprintf(stderr, "       - stream number = %d\n", config.num_streams);
-    fprintf(stderr, "       - thread number = %d\n", config.phi_threads);
+	fprintf(stderr, "stream number = %d\n", config.num_streams);
+    for (int i=0; i<config.num_streams; ++i) {
+        fprintf(stderr, "Case %d - sequence number = %d\n", i, config.num_pairs[i]);
+    }
+    fprintf(stderr, "threads on CPU = %d\n", config.cpu_threads);
+    fprintf(stderr, "threads on PHI = %d\n", config.phi_threads);
 	fprintf(stderr, "sequence length = %d\n", config.length);
     fprintf(stderr, "penalty = %d\n", config.penalty);
     fprintf(stderr, "debug = %d\n", config.debug);
@@ -67,11 +66,17 @@ void print_config()
 
 void validate_config()
 {
-    /*if ( config.length % tile_size != 0 &&
-         config.kernel == 1 ) {
-        fprintf(stderr, "Tile kernel used.\nSequence length should be multiple times of tile size %d\n", tile_size);
-        exit(1);
-    }*/
+	if ( config.length > MAX_SEQ_LEN ) {
+		fprintf(stderr,"The maximum seqence length is %d\n", MAX_SEQ_LEN);
+		exit(0);
+	}
+	for (int i=0; i<config.num_streams; ++i) {
+		if ( config.num_pairs[i] > MAX_SEQ_NUM ) {
+			fprintf(stderr, "In stream %d : %d pairs\n", i, config.num_pairs[i]);
+			fprintf(stderr, "The maximum sequence number per stream is %d\n", MAX_SEQ_NUM);
+			exit(0);
+		}
+	}
 }
 
 int validation(int *score_matrix_cpu, int *score_matrix, unsigned int length)
@@ -123,13 +128,6 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.penalty = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--cpu_pairs") == 0){
-			i++;
-			if (i==argc){
-				fprintf(stderr,"sequence length missing.\n");
-				return 0 ;
-			}
-			config.cpu_pairs = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-T") == 0 || strcmp(argv[i], "--cpu_threads") == 0){
 			i++;
 			if (i==argc){
@@ -137,13 +135,6 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.cpu_threads = atoi(argv[i]);
-		}else if(strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--phi_pairs") == 0){
-			i++;
-			if (i==argc){
-				fprintf(stderr,"pair number on phi missing.\n");
-				return 0 ;
-			}
-			config.phi_pairs = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--phi_threads") == 0){
 			i++;
 			if (i==argc){
@@ -151,6 +142,27 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.phi_threads = atoi(argv[i]);
+		}else if(strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--num_pairs") == 0){
+			i++;
+			if (i==argc){
+				fprintf(stderr,"number of pairs missing.\n");
+				return 0 ;
+			}
+            config.num_pairs[ config.num_streams ] = atoi(argv[i]);
+            config.num_streams++;
+        }else if(strcmp(argv[i], "-f") ==0 || strcmp(argv[i], "--f_cpu") == 0){
+            i++;
+            if (i==argc){
+                fprintf(stderr,"fraction on CPU missing.\n");
+                return 0 ;
+            }
+            config.fraction = atoi(argv[i]);
+            if ( config.fraction<0 || config.fraction>100 ) {
+                fprintf(stderr,"Illegal fraction on CPU : %d%.\n", config.fraction);
+                return 0;
+            }
+
+
 		}else if(strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--lengths") == 0){
 			i++;
 			if (i==argc){
@@ -158,10 +170,6 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.length = atoi(argv[i]);
-			if ( config.length > MAX_SEQ_LEN ) {
-				fprintf(stderr,"The maximum seqence length is %d\n", MAX_SEQ_LEN);
-				return 0;
-			}
 		}
 		else {
 			fprintf(stderr, "Unrecognized option : %s", argv[i]);
@@ -190,12 +198,17 @@ int main(int argc, char **argv)
 
 	int *score_matrix[config.num_streams];
 	srand ( 7 );
-	for (int k=0; k<2;++k) {
+	for (int k=0; k<config.num_streams;++k) {
+		pair_num_cpu[k] = config.num_pairs[k] * config.fraction / 100;
+        pair_num_gpu[k] = config.num_pairs[k] - pair_num_cpu[k];
+        fprintf(stderr, "stream %d:\n", k);
+        fprintf(stderr, "    - On PHI : %d\n", pair_num_phi[k]);
+        fprintf(stderr, "    - On CPU : %d\n", pair_num_cpu[k]);
+
+
+
+
     	pos_matrix[k][0] = pos1[k][0] = pos2[k][0] = 0;
-		if ( k==0 )
-			pair_num[k] = config.cpu_pairs;
-		else
-			pair_num[k] = config.phi_pairs;
 			
     	for (int i=0; i<pair_num[k]; ++i){
         	//please define your own sequence 1
@@ -212,7 +225,6 @@ int main(int argc, char **argv)
         	pos2[k][i+1] = pos2[k][i] + seq2_len;
         	//printf("Matrix size increase: %d\n", (seq1_len+1) * (seq2_len+1));
         	pos_matrix[k][i+1] = pos_matrix[k][i] + (seq1_len+1) * (seq2_len+1);
-			dim_matrix[k][i] = (unsigned int)ceil( (float)seq_len/TILE_SIZE )*TILE_SIZE;
     	}
 		
 		score_matrix[k] = (int *)malloc( pos_matrix[k][pair_num[k]]*sizeof(int) );

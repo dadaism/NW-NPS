@@ -20,12 +20,11 @@ void nw_cuda_tile(cudaStream_t stream, int stream_num);
 void nw_gpu_allocate(int stream_num);
 
 void nw_gpu_destroy(int stream_num);
-
-void nw_gpu(char * sequence_set1, char * sequence_set2, unsigned int * pos1, unsigned int * pos2, 
+*/
+void nw_phi(char * sequence_set1, char * sequence_set2, unsigned int * pos1, unsigned int * pos2, 
             int * score_matrix, unsigned int * pos_matrix, unsigned int pair_num,
-            int * d_score_matrix, cudaStream_t stream, int stream_num, 
-			int kernel_type);
-
+            int stream_num, int kernel_type);
+/*
 void nw_gpu_copyback(int *score_matrix, int *d_score_matrix, unsigned int *pos_matrix, 
 					 unsigned int pair_num, cudaStream_t stream, int stream_num);
 */

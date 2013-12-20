@@ -219,13 +219,13 @@ int main(int argc, char *argv[])
 		//cudaMallocHost( (void **)&score_matrix[k],  pos_matrix[k][pair_num[k]]*sizeof(int) );
 	}
 
-	s_time = gettime();
-/*	for (int i=0; i<config.num_streams; ++i) {
+/*	s_time = gettime();
+	for (int i=0; i<config.num_streams; ++i) {
 		nw_gpu_allocate(i);
 		cudaStreamCreate( &(stream[i]) );
-	}*/
+	}
 	e_time = gettime();
-	fprintf(stderr,"Memory allocation and copy on GPU : %fs\n", e_time - s_time);
+	fprintf(stderr,"Memory allocation and copy on GPU : %fs\n", e_time - s_time);*/
 	
 	s_time = gettime();
 	omp_set_num_threads(config.num_streams);
@@ -236,14 +236,12 @@ int main(int argc, char *argv[])
 		if (DEBUG) {
 			fprintf(stderr,"Stream[%d] starts\n", i);
 		}
-		//nw_gpu(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix[i], pos_matrix[i], pair_num[i], d_score_matrix[i], stream[i], i, config.kernel);
-		//nw_gpu_copyback(score_matrix[i], d_score_matrix[i], pos_matrix[i], pair_num[i], stream[i],i);
-		//cudaStreamSynchronize(stream[i]);
+		nw_phi(sequence_set1[i], sequence_set2[i], pos1[i], pos2[i], score_matrix[i], pos_matrix[i], pair_num[i], i, config.kernel);
 		stream_time_e = gettime();
-		fprintf(stderr,"Stream[%d] runtime on GPU : %fs\n", i, stream_time_e - stream_time_s);
+		fprintf(stderr,"Stream[%d] runtime on PHI : %fs\n", i, stream_time_e - stream_time_s);
 	}	
 	e_time = gettime();
-	fprintf(stderr,"Total runtime on GPU : %fs\n", e_time - s_time);
+	fprintf(stderr,"Total runtime on Phi : %fs\n", e_time - s_time);
 	if (DEBUG) {
 		for ( int i=0; i<config.num_streams; ++i) {
     		int *score_matrix_cpu = (int *)malloc( pos_matrix[i][pair_num[i]]*sizeof(int));

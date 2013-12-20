@@ -17,7 +17,7 @@
 #include <omp.h>
 
 #define MAX_SEQ_LEN 2000
-#define MAX_SEQ_NUM 200
+#define MAX_SEQ_NUM 400
 #define TILE_SIZE 16
 #define MAX_STREAM 20
 
@@ -33,6 +33,7 @@ struct _CONF_ {
 	int cpu_threads;
 	int length;
 	int penalty;
+	int repeat;
 };
 
 extern struct _CONF_ config;
@@ -57,7 +58,6 @@ extern unsigned int * d_pos2[MAX_STREAM];
 extern int * d_score_matrix[MAX_STREAM];
 extern unsigned int * d_pos_matrix[MAX_STREAM];
 extern unsigned int * d_dim_matrix[MAX_STREAM];
-//extern int pair_num[MAX_STREAM];
 extern int pair_num_gpu[MAX_STREAM];
 extern int pair_num_cpu[MAX_STREAM];
 

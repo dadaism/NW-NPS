@@ -31,6 +31,7 @@ void init_conf() {
 	config.num_threads = 32;
 	config.length = 1600;
 	config.penalty = -10;
+	config.repeat = 3;
 }
 
 void init_device(int device) {
@@ -43,13 +44,14 @@ void usage(int argc, char **argv)
     fprintf(stderr, "\nUsage: %s [options]\n", argv[0]);
     fprintf(stderr, "\t[--length|-l <length>] - x and y length (default: %d)\n",config.length);
     fprintf(stderr, "\t[--penalty|-p <penalty>] - penalty (negative integer, default: %d)\n",config.penalty);
-    fprintf(stderr, "\t[--num_pairs|-n <number>] - number of pairs per stream (default: %d)\n",config.num_pairs);
-    fprintf(stderr, "\t[--cpu_threads|-T <threads>]- threads number on cpu (default: %d)\n",config.cpu_threads);
+    fprintf(stderr, "\t[--num_pairs|-n <number>] - number of pairs per stream\n");
+    fprintf(stderr, "\t[--cpu_threads|-T <threads>]- threads number on CPU (default: %d)\n",config.cpu_threads);
 	fprintf(stderr, "\t[--f_cpu|-f <number>]- fraction of pairs on CPU (default: %d)\n",config.fraction);
 	fprintf(stderr, "\t[--device|-d <device>]- device ID (default: %d)\n",config.device);
     fprintf(stderr, "\t[--kernel|-k <kernel type>]- 0: diagonal 1: tile (default: %d)\n",config.kernel);
     fprintf(stderr, "\t[--num_blocks|-b <blocks>]- blocks number per grid (default: %d)\n",config.num_blocks);
     fprintf(stderr, "\t[--num_threads|-t <threads>]- threads number per block (default: %d)\n",config.num_threads);
+    fprintf(stderr, "\t[--repeat|-r <num>]- repeating number (default: %d)\n",config.repeat);
     fprintf(stderr, "\t[--debug]- 0: no validation 1: validation (default: %d)\n",config.debug);
     fprintf(stderr, "\t[--help|-h]- Help information \n");
     exit(1);
@@ -72,6 +74,7 @@ void print_config()
     fprintf(stderr, "penalty = %d\n", config.penalty);
     fprintf(stderr, "block number = %d\n", config.num_blocks);
     fprintf(stderr, "thread number = %d\n", config.num_threads);
+    fprintf(stderr, "repeat = %d\n", config.repeat);
     fprintf(stderr, "debug = %d\n", config.debug);
 	printf("==============================================\n");
 }
@@ -126,6 +129,13 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.kernel = atoi(argv[i]);
+		}else if(strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--repeat") == 0){
+			i++;
+			if (i==argc){
+				fprintf(stderr,"repeating number missing.\n");
+				return 0 ;
+			}
+			config.repeat = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--num_threads") == 0){
 			i++;
 			if (i==argc){
@@ -150,7 +160,7 @@ int parse_arguments(int argc, char **argv)
 		}else if(strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--num_pairs") == 0){
 			i++;
 			if (i==argc){
-				fprintf(stderr,"sequence length missing.\n");
+				fprintf(stderr,"number of paris missing.\n");
 				return 0 ;
 			}
 			config.num_pairs[ config.num_streams ] = atoi(argv[i]);
@@ -273,7 +283,7 @@ int main(int argc, char **argv)
 	s_time = gettime();
 	init_device( dev_num );
 	e_time = gettime();
-	printf("Initialize GPU : %fs\n", e_time - s_time);
+	fprintf(stderr, "Initialize GPU : %fs\n", e_time - s_time);
 
 	s_time = gettime();
 	for (int i=0; i<config.num_streams; ++i) {
@@ -281,8 +291,10 @@ int main(int argc, char **argv)
 		cudaStreamCreate( &(stream[i]) );
 	}
 	e_time = gettime();
-	printf("Memory allocation and copy on GPU : %fs\n", e_time - s_time);
+	fprintf(stderr, "Memory allocation and copy on GPU : %fs\n", e_time - s_time);
 	
+	for (int r=0; r<config.repeat; ++r) {
+	fprintf(stderr, "Round #%d:\n", r);
 	s_time = gettime();
 	#pragma omp parallel for
 	for (int i=0; i<config.num_streams; ++i ) {
@@ -304,7 +316,7 @@ int main(int argc, char **argv)
 		}
 	}
 	e_time = gettime();
-	printf("Computation on CPU & GPU : %fs\n", e_time - s_time);
+	fprintf(stderr, "Computation on CPU & GPU : %fs\n", e_time - s_time);
 	
 	if (DEBUG) {
 		for ( int i=0; i<config.num_streams; ++i) {
@@ -324,6 +336,7 @@ int main(int argc, char **argv)
 			free(score_matrix_valid);
 		}
 	}
+	}	// end for repeat
 	printf("\n");
 	for (int i=0; i<config.num_streams; ++i ) {
 		nw_gpu_destroy(i);

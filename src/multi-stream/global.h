@@ -17,7 +17,7 @@
 #include <omp.h>
 
 #define MAX_SEQ_LEN 2000
-#define MAX_SEQ_NUM 200
+#define MAX_SEQ_NUM 400
 #define MAX_STREAM 20
 
 struct _CONF_ {
@@ -30,6 +30,7 @@ struct _CONF_ {
 	int num_pairs[MAX_STREAM];
 	int length;
 	int penalty;
+	int repeat;
 };
 
 extern struct _CONF_ config;

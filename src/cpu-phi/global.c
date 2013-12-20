@@ -24,15 +24,9 @@ unsigned int pos1[MAX_STREAM][MAX_SEQ_NUM] = {0};
 unsigned int pos2[MAX_STREAM][MAX_SEQ_NUM] = {0};
 unsigned int pos_matrix[MAX_STREAM][MAX_SEQ_NUM] = {0};
 unsigned int dim_matrix[MAX_STREAM][MAX_SEQ_NUM] = {0};
-
-char * d_sequence_set1[MAX_STREAM];
-char * d_sequence_set2[MAX_STREAM];
-unsigned int * d_pos1[MAX_STREAM];
-unsigned int * d_pos2[MAX_STREAM];
-int * d_score_matrix[MAX_STREAM];
-unsigned int * d_pos_matrix[MAX_STREAM];
-unsigned int * d_dim_matrix[MAX_STREAM];
 int pair_num[MAX_STREAM];
+int pair_num_phi[MAX_STREAM];
+int pair_num_cph[MAX_STREAM];
 int penalty;
 int maxLength;
 

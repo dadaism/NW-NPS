@@ -12,66 +12,22 @@
 #include "nw_kernel_phi.c"
 
 
-/*
-void nw_gpu_allocate(int stream_num)
-{
-	int i = stream_num;
-	cudaCheckError( __LINE__, cudaMalloc( (void**)&d_sequence_set1[i], sizeof(char)*pos1[i][pair_num[i]] ) );
-    cudaCheckError( __LINE__, cudaMalloc( (void**)&d_sequence_set2[i], sizeof(char)*pos2[i][pair_num[i]] ) );
-	cudaCheckError( __LINE__, cudaMalloc( (void**)&d_score_matrix[i], sizeof(int)*pos_matrix[i][pair_num[i]]) );
-    cudaCheckError( __LINE__, cudaMalloc( (void**)&d_pos1[i], sizeof(unsigned int)*(pair_num[i]+1) ) );
-    cudaCheckError( __LINE__, cudaMalloc( (void**)&d_pos2[i], sizeof(unsigned int)*(pair_num[i]+1) ) );
-    cudaCheckError( __LINE__, cudaMalloc( (void**)&d_pos_matrix[i], sizeof(unsigned int)*(pair_num[i]+1) ) );	
-    cudaCheckError( __LINE__, cudaMalloc( (void**)&d_dim_matrix[i], sizeof(unsigned int)*(pair_num[i]+1) ) );
 
-	cudaCheckError( __LINE__, cudaMemcpy( d_sequence_set1[i], sequence_set1[i], sizeof(char)*pos1[i][pair_num[i]], cudaMemcpyHostToDevice ) );
-   	cudaCheckError( __LINE__, cudaMemcpy( d_sequence_set2[i], sequence_set2[i], sizeof(char)*pos2[i][pair_num[i]], cudaMemcpyHostToDevice ) );
-   	cudaCheckError( __LINE__, cudaMemcpy( d_pos1[i], pos1[i], sizeof(unsigned int)*(pair_num[i]+1), cudaMemcpyHostToDevice ) );
-   	cudaCheckError( __LINE__, cudaMemcpy( d_pos2[i], pos2[i], sizeof(unsigned int)*(pair_num[i]+1), cudaMemcpyHostToDevice ) );
-   	cudaCheckError( __LINE__, cudaMemcpy( d_pos_matrix[i], pos_matrix[i], sizeof(unsigned int)*(pair_num[i]+1), cudaMemcpyHostToDevice ) );
-	cudaCheckError( __LINE__, cudaMemcpy( d_dim_matrix[i], dim_matrix[i], sizeof(unsigned int)*(pair_num[i]+1), cudaMemcpyHostToDevice ) );
-}
-
-void nw_gpu_destroy(int stream_num)
-{
-	int i = stream_num;
-	cudaCheckError( __LINE__, cudaFree(d_sequence_set1[i]) );
-    cudaCheckError( __LINE__, cudaFree(d_sequence_set2[i]) );
-	cudaCheckError( __LINE__, cudaFree(d_score_matrix[i]) );
-    cudaCheckError( __LINE__, cudaFree(d_pos1[i]) );
-    cudaCheckError( __LINE__, cudaFree(d_pos2[i]) );
-    cudaCheckError( __LINE__, cudaFree(d_pos_matrix[i]) );	
-    cudaCheckError( __LINE__, cudaFree(d_dim_matrix[i]) );
-}
-
-void nw_gpu(char * sequence_set1, char * sequence_set2, unsigned int * pos1, unsigned int * pos2, 
+void nw_phi(char * sequence_set1, char * sequence_set2, unsigned int * pos1, unsigned int * pos2, 
 			int * score_matrix, unsigned int * pos_matrix, unsigned int pair_num,
-			int * d_score_matrix, cudaStream_t stream, int stream_num, int kernel_type)
+			int stream_num, int kernel_type)
 {
-    cudaError_t ce;
 	//printf("Kernel type: %d\n", kernel_type);
 	switch(kernel_type) {
-		case 0: nw_cuda_diagonal(stream, stream_num);
-				break;
-		case 1: nw_cuda_tile(stream, stream_num);
-				break;
+		//case 0: nw_cuda_diagonal(stream, stream_num);
+		//		break;
+		//case 1: nw_cuda_tile(stream, stream_num);
+		//		break;
 		default:
 				break;
 	}
-	ce = cudaGetLastError();
-	if ( ce != cudaSuccess) {
-		fprintf(stdout, "Error: %s\n", cudaGetErrorString(ce));
-	}
 }
-
-void nw_gpu_copyback(int *score_matrix, int *d_score_matrix, unsigned int *pos_matrix, unsigned int pair_num, cudaStream_t stream, int stream_num)
-{
-	int i = stream_num;
-	if (DEBUG) {
-		printf("Dataset %d : %d pairs\n", i, pair_num);
-	}
-	cudaCheckError(__LINE__,cudaMemcpyAsync(score_matrix,d_score_matrix,sizeof(int)*pos_matrix[pair_num],cudaMemcpyDeviceToHost, stream ) );
-}
+/*
 
 void nw_cuda_diagonal( cudaStream_t stream, int stream_num)
 {

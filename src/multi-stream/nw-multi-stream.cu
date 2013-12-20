@@ -27,6 +27,7 @@ void init_conf() {
 	config.num_streams = 0;
 	config.length = 1600;
 	config.penalty = -10;
+	config.repeat = 3;
 }
 
 void init_device(int device) {
@@ -45,8 +46,9 @@ void usage(int argc, char **argv)
     fprintf(stderr, "\t[--kernel|-k <kernel type> ]- 0: diagonal 1: tile (default: %d)\n",config.kernel);
     fprintf(stderr, "\t[--num_blocks|-b <blocks> ]- blocks number per grid (default: %d)\n",config.num_blocks);
     fprintf(stderr, "\t[--num_threads|-t <threads> ]- threads number per block (default: %d)\n",config.num_threads);
+    fprintf(stderr, "\t[--repeat|-r <num> ]- repeating number (default: %d)\n",config.repeat);
     fprintf(stderr, "\t[--debug]- 0: no validation 1: validation (default: %d)\n",config.debug);
-    fprintf(stderr, "\t[--help|-h]- Help information\n");
+    fprintf(stderr, "\t[--help|-h]- help information\n");
     exit(1);
 }
 
@@ -68,6 +70,7 @@ void print_config()
 	if ( config.num_streams==0 ) {
 		fprintf(stderr, "\nNot specify sequence length\n");
 	}
+	fprintf(stderr, "repeat = %d\n", config.repeat);
     fprintf(stderr, "debug = %d\n", config.debug);
 	printf("==============================================\n");
 }
@@ -126,6 +129,13 @@ int parse_arguments(int argc, char **argv)
 				return 0 ;
 			}
 			config.kernel = atoi(argv[i]);
+		}else if(strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--repeat") == 0){
+			i++;
+			if (i==argc){
+				fprintf(stderr,"repeating number missing.\n");
+				return 0 ;
+			}
+			config.repeat = atoi(argv[i]);
 		}else if(strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--num_threads") == 0){
 			i++;
 			if (i==argc){
@@ -241,6 +251,8 @@ int main(int argc, char **argv)
 	e_time = gettime();
 	fprintf(stderr,"Memory allocation and copy on GPU : %fs\n", e_time - s_time);
 	
+	for (int r=0; r<config.repeat; ++r) {
+	fprintf(stderr, "Round #%d:\n", r);
 	s_time = gettime();
 	omp_set_num_threads(config.num_streams);
 	#pragma omp parallel for
@@ -257,7 +269,7 @@ int main(int argc, char **argv)
 		fprintf(stderr,"Stream[%d] runtime on GPU : %fs\n", i, stream_time_e - stream_time_s);
 	}	
 	e_time = gettime();
-	fprintf(stderr,"Total runtime on GPU : %fs\n", e_time - s_time);
+	fprintf(stderr,"Runtime on GPU : %fs\n", e_time - s_time);
 	if (DEBUG) {
 		for ( int i=0; i<config.num_streams; ++i) {
     		int *score_matrix_cpu = (int *)malloc( pos_matrix[i][pair_num[i]]*sizeof(int));
@@ -269,6 +281,7 @@ int main(int argc, char **argv)
 			free(score_matrix_cpu);
 		}
 	}
+	}	// end for repeat
 	printf("\n\n");
 	for (int i=0; i<config.num_streams; ++i ) {
 		nw_gpu_destroy(i);
