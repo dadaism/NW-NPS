@@ -1,13 +1,13 @@
-Hello, this program contains all the Needleman-Wunsch implementation in our paper:
-- "A Distributed CPU-GPU Framework for Pairwise Alignments on Large-Scale Sequence Datasets" (ASAP '13)
+This program contains all the Needleman-Wunsch implementation in our paper:
+* **["A Distributed CPU-GPU Framework for Pairwise Alignments on Large-Scale Sequence Datasets" (ASAP '13)](http://www.danielbit.com/dali/papers/CPU_GPU_NW_ASAP13.pdf)**
 
 Directory structure
 ---------------------------
-- bin: generated binary
-- common: configuration file for make
-- run: script for running
-- src: source code
-- utility: utility source code
+* bin: generated binary
+* common: configuration file for make
+* run: script for running
+* src: source code
+* utility: utility source code
 
 Source file
 --------------------------
